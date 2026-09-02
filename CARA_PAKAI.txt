@@ -1,0 +1,80 @@
+CARA MENJALANKAN SISTEM GUDANG BALAI YASA LAHAT (Next.js + Supabase + Auth)
+==============================================================================
+
+BAGIAN 1 - SETUP SUPABASE (database, gratis)
+---------------------------------------------
+1. Buka https://supabase.com, daftar/login
+2. "New Project" -> isi nama (misal: gudang-byl) -> pilih region "Southeast Asia (Singapore)" -> buat password database -> tunggu selesai
+3. Sidebar kiri -> "SQL Editor" -> "New query"
+4. Buka file supabase-schema.sql (di folder project ini), copy semua isinya, paste ke SQL Editor, klik "Run"
+   (ini akan membuat tabel master_barang, transaksi, profiles, dan fungsi proses_transaksi)
+5. Sidebar kiri -> "Project Settings" -> "API" -> catat "Project URL" dan "anon public" key
+
+BAGIAN 2 - SETUP PROJECT DI LAPTOP
+------------------------------------
+1. Install Node.js kalau belum ada: https://nodejs.org (versi LTS)
+2. Buka folder project ini lewat terminal
+3. Ketik: npm install
+4. Copy file ".env.local.example" jadi ".env.local", isi dengan URL dan anon key dari Bagian 1
+5. Ketik: npm run dev
+6. Buka browser: http://localhost:3000 -> otomatis diarahkan ke halaman Login
+
+BAGIAN 3 - BUAT AKUN ADMIN PERTAMA (WAJIB, lakukan sebelum yang lain)
+------------------------------------------------------------------------
+1. Di halaman Login, klik "Daftar", isi nama lengkap + email + password Anda sendiri
+2. Setelah daftar, akun ini otomatis dibuat dengan role "teknisi" (default aman)
+3. Kita perlu naikkan jadi admin secara manual (supaya tidak sembarang orang bisa jadi admin sendiri):
+   - Buka Supabase -> SQL Editor -> New query
+   - Jalankan (ganti email dengan email yang tadi Anda daftarkan):
+
+     update profiles set role = 'admin'
+     where id = (select id from auth.users where email = 'email_anda@contoh.com');
+
+4. Login lagi di aplikasi -> sekarang menu "Master Barang" dan "Barang Masuk" sudah muncul (khusus admin)
+
+BAGIAN 4 - TAMBAH AKUN UNTUK TEKNISI
+----------------------------------------
+Untuk teknisi lain, ada 2 cara:
+- Suruh mereka daftar sendiri lewat halaman Login (otomatis jadi role "teknisi", tidak perlu Anda naikkan)
+- Atau Anda buatkan lewat Supabase -> Authentication -> Users -> Add User
+
+Teknisi dengan role "teknisi" hanya bisa akses Dashboard dan Pengambilan (Scan QR) -
+tidak bisa masuk ke Master Barang atau Barang Masuk. Ini yang menjaga data master tidak sembarang diubah.
+
+BAGIAN 5 - COBA SEMUA FITUR
+------------------------------
+1. Login sebagai admin -> menu "Master Barang" -> coba tambah barang baru
+2. Menu "Barang Masuk" -> tambah stok
+3. Menu "Cetak QR" -> ini QR untuk ditempel di gudang (1 QR saja, bukan per-barang)
+4. Menu "Pengambilan (Scan QR)" -> nama pengambil otomatis terisi dari akun yang login,
+   cari nama barang, pilih, isi qty, submit -> stok otomatis berkurang
+5. Coba juga logout, lalu login dengan akun teknisi (kalau sudah ada) -> pastikan menu admin memang tidak muncul
+
+BAGIAN 6 - PUBLISH KE INTERNET (supaya QR bisa discan dari HP di gudang)
+----------------------------------------------------------------------------
+1. Buat akun gratis di https://vercel.com (bisa pakai akun Github)
+2. Push folder project ini ke Github
+3. Di Vercel: "New Project" -> pilih repo Github Anda
+4. Di "Environment Variables", tambahkan NEXT_PUBLIC_SUPABASE_URL dan NEXT_PUBLIC_SUPABASE_ANON_KEY (isi dari Bagian 1)
+5. Deploy -> dapat alamat seperti https://gudang-byl.vercel.app
+6. Buka "Cetak QR" di alamat itu, cetak, tempel di gudang
+
+BAGIAN 7 - BACKUP DATA (paket gratis Supabase TIDAK backup otomatis)
+--------------------------------------------------------------------------
+Install Supabase CLI, lalu jalankan seminggu sekali:
+   supabase db dump --db-url "postgresql://postgres:[password]@[host]:5432/postgres" > backup-tanggal.sql
+Simpan file hasilnya ke Google Drive/laptop sebagai cadangan.
+(Detail lengkap perintah ini bisa diminta ke Claude kapan saja)
+
+CATATAN PENTING SOAL KEAMANAN
+----------------------------------
+- Jangan commit file .env.local ke Github publik (sudah otomatis di-ignore lewat .gitignore)
+- Semua tambah/kurang stok WAJIB lewat fungsi database (proses_transaksi), bukan edit tabel langsung -
+  ini yang membuat data tetap konsisten dan tidak bisa "diakali" dari luar aplikasi
+- Kalau nanti mau audit siapa yang melakukan transaksi apa, cek kolom "dibuat_oleh" di tabel transaksi
+
+KALAU ADA ERROR
+------------------
+- "supabaseUrl is required" -> file .env.local belum diisi, atau belum restart npm run dev
+- Setelah daftar, halaman putih/menu admin tidak muncul -> pastikan sudah jalankan perintah "update profiles set role = 'admin'" di Bagian 3
+- Bawa pesan error yang muncul ke Claude untuk dibantu debug
